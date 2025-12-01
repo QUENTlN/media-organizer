@@ -1,13 +1,19 @@
+<p align="center">
+  <img src="assets/icon.png" alt="Media Organizer Icon" width="128">
+</p>
+
 # Media Organizer
 
 A powerful PowerShell-based tool to organize your media library (Movies and TV Series). It automatically detects media types, renames files to a standard format, and moves or copies them to a structured destination.
+
+![Media Organizer Example](assets/example.png)
 
 ## Features
 
 -   **Smart Detection**: Automatically identifies Movies and TV Series based on filenames (supports patterns like `S01E01`, `Year`, `PART1`, etc.).
 -   **Structured Organization**:
     -   **Series**: `Destination\Series\Show Name\Season XX\Show Name - SXXEXX.ext`
-    -   **Movies**: `Destination\Films\Movie Name (Year)\Movie Name (Year).ext`
+    -   **Movies**: `Destination\Movies\Movie Name (Year)\Movie Name (Year).ext`
 -   **Dual Modes**:
     -   **Interactive TUI**: A text-based user interface inspired by file managers like Midnight Commander.
     -   **Headless Mode**: Fully automated command-line execution (great for post-processing scripts).
@@ -86,7 +92,7 @@ RunMediaOrganizer.cmd <SourcePath> <DestinationPath> [move|copy] [Auto|Movie|Ser
 
 **Parameters:**
 -   `SourcePath`: The directory or file to process.
--   `DestinationPath`: The root folder where `Films` and `Series` folders will be created.
+-   `DestinationPath`: The root folder where `Movies` and `Series` folders will be created.
 -   `Action`: `move` (default) or `copy`.
 -   `MediaType`: `Auto` (default), `Movie`, or `Serie`.
 

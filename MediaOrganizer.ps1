@@ -119,7 +119,7 @@ function Invoke-MediaOrganization {
             else {
                 $info = Parse-Movie -filename $file.BaseName
                 if ($info) {
-                    $destDir = if ($info.Year -eq "NO_YEAR") { Join-Path $DestinationPath "Films\$($info.Name)" } else { Join-Path $DestinationPath "Films\$($info.Name) ($($info.Year))" }
+                    $destDir = if ($info.Year -eq "NO_YEAR") { Join-Path $DestinationPath "Movies\$($info.Name)" } else { Join-Path $DestinationPath "Movies\$($info.Name) ($($info.Year))" }
                     $destFile = if ($info.Year -eq "NO_YEAR") { "$($info.Name)$($file.Extension)" } else { "$($info.Name) ($($info.Year))$($file.Extension)" }
                 }
             }
