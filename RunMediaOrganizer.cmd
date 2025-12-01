@@ -26,7 +26,7 @@ if "!output!"=="" (
 )
 if "!action!"=="" set "action=move"
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%~dp0MediaOrganizer.ps1' -SourcePath '!source!' -OutputPath '!output!' -Action '!action!'"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%~dp0MediaOrganizer.ps1' -TargetDirectory '!source!' -DestinationDirectory '!output!' -ActionType '!action!'"
 exit /b 0
 
 :usage
