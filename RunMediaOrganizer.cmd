@@ -15,6 +15,7 @@ if not "%D=%"=="" (
 )
 
 set "action=%~3"
+set "mediatype=%~4"
 
 if "!source!"=="" (
     echo Error: Source path is required
@@ -25,11 +26,12 @@ if "!output!"=="" (
     goto :usage
 )
 if "!action!"=="" set "action=move"
+if "!mediatype!"=="" set "mediatype=Auto"
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%~dp0MediaOrganizer.ps1' -TargetDirectory '!source!' -DestinationDirectory '!output!' -ActionType '!action!'"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%~dp0MediaOrganizer.ps1' -TargetDirectory '!source!' -DestinationDirectory '!output!' -ActionType '!action!' -MediaType '!mediatype!'"
 exit /b 0
 
 :usage
-echo Usage: RunMediaOrganizer.cmd source_path output_path [move^|copy]
-echo Example: RunMediaOrganizer.cmd "C:\Downloads\Series" "D:\Media" move
+echo Usage: RunMediaOrganizer.cmd source_path output_path [move^|copy] [Auto^|Movie^|Serie]
+echo Example: RunMediaOrganizer.cmd "C:\Downloads\Series" "D:\Media" move Auto
 exit /b 1

@@ -2,7 +2,8 @@ param(
     [string]$SourceFile,
     [string]$TargetDirectory,
     [string]$DestinationDirectory,
-    [string]$ActionType = "move"
+    [string]$ActionType = "move",
+    [string]$MediaType = "Auto"
 )
 
 # ==========================================
@@ -69,7 +70,9 @@ function Invoke-MediaOrganization {
         [Parameter(Mandatory = $true)]
         [string]$DestinationPath,
         
-        [string]$Action = "move"
+        [string]$Action = "move",
+        
+        [string]$MediaType = "Auto"
     )
 
     $processedCount = 0
@@ -92,10 +95,21 @@ function Invoke-MediaOrganization {
         }
 
         foreach ($file in $filesToProcess) {
-            $mediaType = Get-MediaType -filename $file.Name -partsInDirectory $partsCount
+            # Determine effective media type
+            $effectiveType = $null
+            if ($MediaType -eq "Serie") {
+                $effectiveType = "tv"
+            }
+            elseif ($MediaType -eq "Movie") {
+                $effectiveType = "movie"
+            }
+            else {
+                $effectiveType = Get-MediaType -filename $file.Name -partsInDirectory $partsCount
+            }
+            
             $info = $null
             
-            if ($mediaType -eq "tv") {
+            if ($effectiveType -eq "tv") {
                 $info = Parse-TVShow -filename $file.BaseName
                 if ($info) {
                     $destDir = Join-Path $DestinationPath "Series\$($info.Name)\Season $($info.Season.ToString('00'))"
@@ -105,7 +119,7 @@ function Invoke-MediaOrganization {
             else {
                 $info = Parse-Movie -filename $file.BaseName
                 if ($info) {
-                    $destDir = if ($info.Year -eq "NO_YEAR") { Join-Path $DestinationPath "Movies\$($info.Name)" } else { Join-Path $DestinationPath "Movies\$($info.Name) ($($info.Year))" }
+                    $destDir = if ($info.Year -eq "NO_YEAR") { Join-Path $DestinationPath "Films\$($info.Name)" } else { Join-Path $DestinationPath "Films\$($info.Name) ($($info.Year))" }
                     $destFile = if ($info.Year -eq "NO_YEAR") { "$($info.Name)$($file.Extension)" } else { "$($info.Name) ($($info.Year))$($file.Extension)" }
                 }
             }
@@ -168,6 +182,8 @@ function Start-TUI {
         LeftItems     = @()
         RightItems    = @()
         Action        = "move" # move, copy
+        MediaType     = "Auto" # Auto, Movie, Serie
+        BottomRow     = 0 # 0 = Action, 1 = Type
         Running       = $true
         Message       = ""
     }
@@ -243,7 +259,7 @@ function Start-TUI {
         [int]$height = $h
         
         [int]$panelWidth = [math]::Floor(($width - 4) / 2)
-        [int]$listHeight = $height - 8
+        [int]$listHeight = $height - 9
 
         # Helper to truncate text
         function Trunc($t, $w) { if ($t.Length -gt $w) { $t.Substring(0, $w - 3) + "..." }else { $t.PadRight($w) } }
@@ -307,15 +323,25 @@ function Start-TUI {
             }
         }
 
-        # Draw Bottom Panel (Action)
-        Set-Cursor 0 ($height - 5)
+        # Draw Bottom Panel
+        Set-Cursor 0 ($height - 6)
         Write-Host ("-" * ($width - 1)) -ForegroundColor DarkGray
         
+        # Action Row
         $actionStr = " Action: "
         if ($state.Action -eq "move") { $actionStr += "[*] Move  [ ] Copy" } else { $actionStr += "[ ] Move  [*] Copy" }
         
-        $bg = if ($state.ActivePanel -eq "Bottom") { "DarkBlue" } else { "Black" }
-        Write-Host $actionStr -BackgroundColor $bg -ForegroundColor White
+        $bgAction = if ($state.ActivePanel -eq "Bottom" -and $state.BottomRow -eq 0) { "DarkBlue" } else { "Black" }
+        Write-Host $actionStr -BackgroundColor $bgAction -ForegroundColor White
+        
+        # Type Row
+        $typeStr = " Type:   "
+        if ($state.MediaType -eq "Auto") { $typeStr += "[*] Auto  [ ] Movie  [ ] Serie" }
+        elseif ($state.MediaType -eq "Movie") { $typeStr += "[ ] Auto  [*] Movie  [ ] Serie" }
+        else { $typeStr += "[ ] Auto  [ ] Movie  [*] Serie" }
+        
+        $bgType = if ($state.ActivePanel -eq "Bottom" -and $state.BottomRow -eq 1) { "DarkBlue" } else { "Black" }
+        Write-Host $typeStr -BackgroundColor $bgType -ForegroundColor White
         
         Write-Host " [EXECUTE] (Press E)" -ForegroundColor Green
         
@@ -325,7 +351,7 @@ function Start-TUI {
         
         # Help
         Set-Cursor 0 ($height - 1)
-        Write-Host "TAB: Switch Panel | SPACE: Select | ENTER: Open | BACKSPACE/..: Up | M: Move | C: Copy | E: Execute | Q: Quit" -ForegroundColor DarkGray -NoNewline
+        Write-Host "TAB: Switch | SPACE: Select/Toggle | ENTER: Open | UP/DOWN: Navigate | M/C/T: Quick Keys | E: Execute | Q: Quit" -ForegroundColor DarkGray -NoNewline
     }
 
     while ($state.Running) {
@@ -333,8 +359,9 @@ function Start-TUI {
         $key = $ui.ReadKey("NoEcho,IncludeKeyDown")
         
         if ($key.VirtualKeyCode -eq 9) {
-            # TAB
+            # TAB - Cycle through panels
             if ($state.ActivePanel -eq "Left") { $state.ActivePanel = "Right" }
+            elseif ($state.ActivePanel -eq "Right") { $state.ActivePanel = "Bottom"; $state.BottomRow = 0 }
             else { $state.ActivePanel = "Left" }
         }
         elseif ($key.VirtualKeyCode -eq 81) {
@@ -345,14 +372,16 @@ function Start-TUI {
             # UP
             if ($state.ActivePanel -eq "Left" -and $state.LeftCursor -gt 0) { $state.LeftCursor-- }
             if ($state.ActivePanel -eq "Right" -and $state.RightCursor -gt 0) { $state.RightCursor-- }
+            if ($state.ActivePanel -eq "Bottom" -and $state.BottomRow -gt 0) { $state.BottomRow-- }
         }
         elseif ($key.VirtualKeyCode -eq 40) {
             # DOWN
-            if ($state.ActivePanel -eq "Left") { $state.LeftCursor++ } # Boundary check needed strictly but lazy for now
-            if ($state.ActivePanel -eq "Right") { $state.RightCursor++ }
+            if ($state.ActivePanel -eq "Left" -and $state.LeftCursor -lt ($state.LeftItems.Count - 1)) { $state.LeftCursor++ }
+            if ($state.ActivePanel -eq "Right" -and $state.RightCursor -lt ($state.RightItems.Count - 1)) { $state.RightCursor++ }
+            if ($state.ActivePanel -eq "Bottom" -and $state.BottomRow -lt 1) { $state.BottomRow++ }
         }
-        elseif ($key.VirtualKeyCode -eq 32) {
-            # SPACE
+        elseif ($key.VirtualKeyCode -eq 32 -or $key.VirtualKeyCode -eq 37 -or $key.VirtualKeyCode -eq 39) {
+            # SPACE or LEFT or RIGHT
             if ($state.ActivePanel -eq "Left") {
                 $items = $state.LeftItems
                 if ($state.LeftCursor -lt $items.Count) {
@@ -364,7 +393,16 @@ function Start-TUI {
                 }
             }
             if ($state.ActivePanel -eq "Bottom") {
-                if ($state.Action -eq "move") { $state.Action = "copy" } else { $state.Action = "move" }
+                if ($state.BottomRow -eq 0) {
+                    # Toggle Action
+                    if ($state.Action -eq "move") { $state.Action = "copy" } else { $state.Action = "move" }
+                }
+                else {
+                    # Cycle Type
+                    if ($state.MediaType -eq "Auto") { $state.MediaType = "Movie" }
+                    elseif ($state.MediaType -eq "Movie") { $state.MediaType = "Serie" }
+                    else { $state.MediaType = "Auto" }
+                }
             }
         }
         elseif ($key.VirtualKeyCode -eq 13) {
@@ -415,6 +453,12 @@ function Start-TUI {
         }
         elseif ($key.Character -eq 'm') { $state.Action = "move" }
         elseif ($key.Character -eq 'c') { $state.Action = "copy" }
+        elseif ($key.Character -eq 't') {
+            # Quick cycle Type
+            if ($state.MediaType -eq "Auto") { $state.MediaType = "Movie" }
+            elseif ($state.MediaType -eq "Movie") { $state.MediaType = "Serie" }
+            else { $state.MediaType = "Auto" }
+        }
         elseif ($key.Character -eq 'e') {
             # EXECUTE
             if ($state.LeftSelection.Count -eq 0) {
@@ -422,13 +466,13 @@ function Start-TUI {
             }
             else {
                 Clear-Host
-                Write-Host "Executing $($state.Action)..." -ForegroundColor Cyan
+                Write-Host "Executing $($state.Action) with type: $($state.MediaType)..." -ForegroundColor Cyan
                 $itemsToProcess = @()
                 foreach ($path in $state.LeftSelection.Keys) {
                     $itemsToProcess += Get-Item -LiteralPath $path
                 }
         
-                Invoke-MediaOrganization -SourceItems $itemsToProcess -DestinationPath $state.RightPath -Action $state.Action
+                Invoke-MediaOrganization -SourceItems $itemsToProcess -DestinationPath $state.RightPath -Action $state.Action -MediaType $state.MediaType
         
                 $state.LeftItems = Get-DirItems $state.LeftPath
                 $state.RightItems = Get-DirItems $state.RightPath
@@ -455,7 +499,7 @@ if ($TargetDirectory -and $DestinationDirectory) {
     if (-not (Test-Path $DestinationDirectory)) { Write-Error "Destination path not found: $DestinationDirectory"; exit 1 }
     
     $sourceItem = Get-Item $TargetDirectory
-    Invoke-MediaOrganization -SourceItems @($sourceItem) -DestinationPath $DestinationDirectory -Action $ActionType
+    Invoke-MediaOrganization -SourceItems @($sourceItem) -DestinationPath $DestinationDirectory -Action $ActionType -MediaType $MediaType
 }
 else {
     # TUI Mode
